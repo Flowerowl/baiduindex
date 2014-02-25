@@ -5,10 +5,14 @@ import urllib
 
 from bs4 import BeautifulSoup
 import xlwt
+import yaml
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 
 import response
 
+global gl_driver
+gl_driver = webdriver.Firefox()
 
 TOP250 = 'http://movie.douban.com/top250?start=%d&filter=&format=text'
 INDEX = 'http://index.baidu.com/?tpl=trend&word=%s'
@@ -21,11 +25,23 @@ def createxls(result):
             sheet.write(i, j, col)
     wbk.save('baiduindex.xls')
 
-def index(title):
-    #soup = BeautifulSoup(response.get_source(INDEX % urllib.quote(title.encode('utf-8'))))
-    driver = webdriver.Firefox()
-    driver.get(INDEX % urllib.quote(title.encode('gbk')))
+def login(times, title):
+    gl_driver.implicitly_wait(10)
+    gl_driver.get(INDEX % urllib.quote(title.encode('gbk')))
+    if times == 1:
+        elem = gl_driver.find_element_by_name("userName")
+        elem.send_keys(yaml.load(open('config.yaml').read())['username'])
+        elem = gl_driver.find_element_by_name("password")
+        elem.send_keys(yaml.load(open('config.yaml').read())['password'])
+        elem.send_keys(Keys.RETURN)
 
+def index(times, title):
+    index = {}
+    login(times, title)
+    for i, elem in enumerate(gl_driver.find_elements_by_class_name("ftlwhf")):
+        index[i] = elem.text
+        print elem.text
+    return index
 
 def top250():
     result = []
@@ -40,8 +56,7 @@ def top250():
                 'rating' : movie.em.text,
                 'comments' : movie.find(attrs={'headers':'m_rating_num'}).text.strip()
             })
-            #index(movie.a.text.split('/')[0])
+            result[-1].update(index(int(movie.find(attrs={'class':'m_order'}).text.strip()), movie.a.text.split('/')[0].strip()))
     createxls(result)
 
-#top250()
-index(u'肖生克的救赎')
+top250()
